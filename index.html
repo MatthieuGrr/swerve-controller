@@ -482,9 +482,9 @@ function draw() {
 
   // Pince (cosmétique)
   const px = rl/2;
-  const pw = 5*S, pd = 10*S, pt = 4*S;
+  const pw = 8*S, pd = 15*S, pt = 6*S;
   ctx.strokeStyle = '#c8d8ff';
-  ctx.lineWidth = 2.5;
+  ctx.lineWidth = 3;
   ctx.lineJoin = 'round';
   ctx.beginPath(); ctx.moveTo(px, -pw); ctx.lineTo(px + pd, -pw); ctx.lineTo(px + pd, -pw + pt); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(px, pw);  ctx.lineTo(px + pd, pw);  ctx.lineTo(px + pd,  pw - pt); ctx.stroke();
@@ -520,13 +520,24 @@ function draw() {
 
     ctx.save();
     ctx.translate(cmx, cmy);
-    ctx.rotate(-(th + mAngle));   // FIX: angle monde = theta_robot + angle_module
-    ctx.fillStyle = '#00cc00';
-    ctx.strokeStyle = '#009900';
+    ctx.rotate(-(th + mAngle));
+    // Corps de la roue
+    ctx.fillStyle = '#00aa00';
+    ctx.strokeStyle = '#007700';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.roundRect(-7*S, -3.5*S, 14*S, 7*S, 2);
+    ctx.roundRect(-10*S, -5*S, 20*S, 10*S, 2);
     ctx.fill(); ctx.stroke();
+    // Bande avant pour indiquer l'orientation
+    ctx.fillStyle = '#00ff88';
+    ctx.beginPath();
+    ctx.roundRect(0, -5*S, 10*S, 10*S, [0, 2, 2, 0]);
+    ctx.fill();
+    // Point de direction
+    ctx.fillStyle = 'white';
+    ctx.beginPath();
+    ctx.arc(6*S, 0, 2*S, 0, Math.PI*2);
+    ctx.fill();
     ctx.restore();
 
     ctx.fillStyle = '#00ee00';
