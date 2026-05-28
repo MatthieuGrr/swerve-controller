@@ -166,7 +166,7 @@
 <div class="container">
   <div class="card">
     <h2>Swerve Drive Simulator</h2>
-    <p class="instruction">👆 Cliquez ou touchez le canvas pour définir un objectif</p>
+    <p class="instruction">👆 Appuyez pour définir un objectif · Glissez pour choisir l'angle d'arrivée</p>
     <canvas id="canvas"></canvas>
   </div>
 
@@ -277,7 +277,7 @@ class SwerveRobot {
     this.moduleSpeeds = [0, 0];
   }
 
-  computeControl(tx, ty) {
+  computeControl(tx, ty, ttheta = null) {
     const ex = tx - this.x;
     const ey = ty - this.y;
     const distance = Math.sqrt(ex*ex + ey*ey);
@@ -291,8 +291,17 @@ class SwerveRobot {
     const vy_cmd = clamp(Ky * ey_r, -MAX_VXY, MAX_VXY);
 
     const angle_to_target = Math.atan2(ey, ex);
-    let etheta = norm(angle_to_target - this.theta);
-    const omega_cmd = (distance > 5) ? clamp(Ktheta * etheta, -MAX_OMEGA, MAX_OMEGA) : 0;
+    let desired_heading;
+    if (ttheta !== null) {
+      // Blend progressivement de angle_to_target (loin) vers ttheta (proche)
+      const blend = Math.max(0, 1 - distance / 25);
+      desired_heading = angle_to_target + blend * norm(ttheta - angle_to_target);
+    } else {
+      desired_heading = angle_to_target;
+    }
+    const etheta = norm(desired_heading - this.theta);
+    const omega_cmd = (distance > 5 || ttheta !== null)
+      ? clamp(Ktheta * etheta, -MAX_OMEGA, MAX_OMEGA) : 0;
 
     return { vx_cmd, vy_cmd, omega_cmd, distance };
   }
@@ -350,10 +359,12 @@ const ctx    = canvas.getContext('2d');
 let canvasW = 800, canvasH = 600;
 let robot = new SwerveRobot(0, 0, 0);
 let target = null;
+let target_theta = null;   // angle d'arrivée souhaité (null = libre)
 let running = false;
 let trajectory = [];
-let lastModules = null;
-let lastCtrl = null;
+let isDragging = false;
+let dragOriginCanvas = null;
+let pointerCanvas = null;
 
 function resizeCanvas() {
   const maxW = Math.min(900, window.innerWidth - 32);
@@ -381,6 +392,7 @@ function canvasToWorld(cx, cy) {
 // ─── Dessin ─────────────────────────────────────────────────────────────────
 function draw() {
   ctx.clearRect(0, 0, canvasW, canvasH);
+  const S = canvasW / 800;
 
   // Grille
   ctx.strokeStyle = 'rgba(255,255,255,0.06)';
@@ -413,17 +425,45 @@ function draw() {
   // Objectif
   if (target) {
     const [tx, ty] = worldToCanvas(target[0], target[1]);
-    ctx.beginPath(); ctx.arc(tx, ty, 8, 0, Math.PI*2);
+
+    // Preview glissement (tirets orange vers le curseur)
+    if (isDragging && pointerCanvas) {
+      ctx.save();
+      ctx.setLineDash([5, 5]);
+      ctx.strokeStyle = 'rgba(255,160,0,0.55)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(pointerCanvas[0], pointerCanvas[1]); ctx.stroke();
+      ctx.restore();
+    }
+
+    // Flèche d'angle d'arrivée (pleine quand définie)
+    if (target_theta !== null) {
+      const AL = 38 * S;
+      const ax = tx + AL * Math.cos(target_theta);   // monde: x→droite
+      const ay = ty - AL * Math.sin(target_theta);   // monde: y→haut, canvas: y→bas
+      const angle = Math.atan2(ay - ty, ax - tx);
+      ctx.save();
+      ctx.strokeStyle = '#ff8800'; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(ax, ay); ctx.stroke();
+      const HL = 11 * S;
+      ctx.beginPath();
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(ax - HL * Math.cos(angle - Math.PI/6), ay - HL * Math.sin(angle - Math.PI/6));
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(ax - HL * Math.cos(angle + Math.PI/6), ay - HL * Math.sin(angle + Math.PI/6));
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    ctx.beginPath(); ctx.arc(tx, ty, 8 * S, 0, Math.PI*2);
     ctx.fillStyle = '#ff4444'; ctx.fill();
     ctx.strokeStyle = '#ff0000'; ctx.lineWidth = 2; ctx.stroke();
     ctx.fillStyle = 'white';
-    ctx.font = `bold ${11 * canvasW/800}px -apple-system,sans-serif`;
+    ctx.font = `bold ${11 * S}px -apple-system,sans-serif`;
     ctx.textAlign = 'center';
-    ctx.fillText('Objectif', tx, ty - 13);
+    ctx.fillText('Objectif', tx, ty - 13 * S);
   }
 
   const [rx, ry] = worldToCanvas(robot.x, robot.y);
-  const S = canvasW / 800;
   const th = robot.theta;
 
   ctx.save();
@@ -478,7 +518,7 @@ function draw() {
 
     ctx.save();
     ctx.translate(cmx, cmy);
-    ctx.rotate(-mAngle);
+    ctx.rotate(-(th + mAngle));   // FIX: angle monde = theta_robot + angle_module
     ctx.fillStyle = '#00cc00';
     ctx.strokeStyle = '#009900';
     ctx.lineWidth = 1.5;
@@ -512,13 +552,16 @@ function draw() {
 
 // ─── UI ─────────────────────────────────────────────────────────────────────
 function updateUI(ctrl, mods) {
+  const thetaTarget = target_theta !== null
+    ? `${(target_theta * 180/Math.PI).toFixed(0)}°` : '—';
   document.getElementById('state-card').innerHTML =
     `x: ${robot.x.toFixed(1)} cm<br>` +
     `y: ${robot.y.toFixed(1)} cm<br>` +
     `θ: ${(robot.theta * 180/Math.PI).toFixed(1)}°<br>` +
     `vx: ${robot.vx.toFixed(1)} cm/s<br>` +
     `vy: ${robot.vy.toFixed(1)} cm/s<br>` +
-    `ω: ${(robot.omega * 180/Math.PI).toFixed(1)} °/s`;
+    `ω: ${(robot.omega * 180/Math.PI).toFixed(1)} °/s<br>` +
+    `θ cible: ${thetaTarget}`;
 
   if (mods) {
     document.getElementById('modules-card').innerHTML =
@@ -531,42 +574,78 @@ function updateUI(ctrl, mods) {
 // ─── Boucle simulate ────────────────────────────────────────────────────────
 setInterval(() => {
   if (running && target) {
-    const ctrl = robot.computeControl(target[0], target[1]);
-    const mods = robot.inverseKinematics(ctrl.vx_cmd, ctrl.vy_cmd, ctrl.omega_cmd);
-    robot.update(ctrl.vx_cmd, ctrl.vy_cmd, ctrl.omega_cmd, DT);
+    const ctrl = robot.computeControl(target[0], target[1], target_theta);
+
+    let vx = ctrl.vx_cmd, vy = ctrl.vy_cmd, omega = ctrl.omega_cmd;
+    const at_pos = ctrl.distance < 2;
+    const heading_err = target_theta !== null ? Math.abs(norm(robot.theta - target_theta)) : 0;
+    const heading_ok  = target_theta === null || heading_err < 0.1;
+
+    // Position atteinte mais cap pas encore aligné : rotation sur place
+    if (at_pos && !heading_ok) {
+      vx = 0; vy = 0;
+      omega = clamp(Ktheta * norm(target_theta - robot.theta), -MAX_OMEGA, MAX_OMEGA);
+    }
+
+    const mods = robot.inverseKinematics(vx, vy, omega);
+    robot.update(vx, vy, omega, DT);
     trajectory.push([robot.x, robot.y]);
     if (trajectory.length > 1000) trajectory = trajectory.slice(-500);
-    if (ctrl.distance < 2) {
+    if (at_pos && heading_ok) {
       running = false;
       robot.vx = 0; robot.vy = 0; robot.omega = 0;
     }
-    lastCtrl = ctrl; lastModules = mods;
     updateUI(ctrl, mods);
   }
   draw();
 }, DT * 1000);
 
-// ─── Événements canvas ───────────────────────────────────────────────────────
-function handlePointer(e) {
-  e.preventDefault();
+// ─── Événements canvas (pointer events — souris + touch) ─────────────────────
+function getCanvasXY(e) {
   const rect = canvas.getBoundingClientRect();
-  let cx, cy;
-  if (e.touches) {
-    cx = e.touches[0].clientX - rect.left;
-    cy = e.touches[0].clientY - rect.top;
-  } else {
-    cx = e.clientX - rect.left;
-    cy = e.clientY - rect.top;
-  }
-  // Ajuster selon la taille CSS vs canvas interne
-  const scaleX = canvasW / rect.width;
-  const scaleY = canvasH / rect.height;
-  target = canvasToWorld(cx * scaleX, cy * scaleY);
-  running = true;
+  return [
+    (e.clientX - rect.left) * (canvasW / rect.width),
+    (e.clientY - rect.top)  * (canvasH / rect.height),
+  ];
 }
 
-canvas.addEventListener('click',      handlePointer);
-canvas.addEventListener('touchstart', handlePointer, { passive: false });
+canvas.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  canvas.setPointerCapture(e.pointerId);
+  const [cx, cy] = getCanvasXY(e);
+  target = canvasToWorld(cx, cy);
+  target_theta = null;
+  dragOriginCanvas = [cx, cy];
+  pointerCanvas = [cx, cy];
+  isDragging = true;
+  running = false;
+  draw();  // affiche le point immédiatement
+});
+
+canvas.addEventListener('pointermove', e => {
+  if (!isDragging) return;
+  e.preventDefault();
+  const [cx, cy] = getCanvasXY(e);
+  pointerCanvas = [cx, cy];
+  const dx = cx - dragOriginCanvas[0];
+  const dy = cy - dragOriginCanvas[1];
+  // Seuil 15px pour ne pas déclencher par accident
+  target_theta = Math.sqrt(dx*dx + dy*dy) > 15
+    ? Math.atan2(-dy, dx)   // canvas y vers le bas → inverser pour repère monde
+    : null;
+  draw();
+});
+
+canvas.addEventListener('pointerup', e => {
+  if (!isDragging) return;
+  isDragging = false;
+  running = true;
+});
+
+canvas.addEventListener('pointercancel', e => {
+  isDragging = false;
+  running = true;
+});
 
 // ─── Sliders ─────────────────────────────────────────────────────────────────
 document.getElementById('sl-kx').addEventListener('input', e => {
@@ -589,10 +668,10 @@ document.getElementById('sl-vmax').addEventListener('input', e => {
 // ─── Boutons ─────────────────────────────────────────────────────────────────
 document.getElementById('btn-reset').addEventListener('click', () => {
   robot = new SwerveRobot(0, 0, 0);
-  target = null; running = false; trajectory = [];
-  lastModules = null; lastCtrl = null;
+  target = null; target_theta = null; running = false;
+  trajectory = []; isDragging = false; pointerCanvas = null;
   document.getElementById('state-card').innerHTML =
-    'x: 0.0 cm<br>y: 0.0 cm<br>θ: 0.0°<br>vx: 0.0 cm/s<br>vy: 0.0 cm/s<br>ω: 0.0 °/s';
+    'x: 0.0 cm<br>y: 0.0 cm<br>θ: 0.0°<br>vx: 0.0 cm/s<br>vy: 0.0 cm/s<br>ω: 0.0 °/s<br>θ cible: —';
   document.getElementById('modules-card').innerHTML =
     'AR-G — angle: 0° | speed: 0.0 cm/s | PWM: 0<br>AR-D — angle: 0° | speed: 0.0 cm/s | PWM: 0';
   draw();
