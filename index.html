@@ -235,13 +235,15 @@ const ROBOT_WIDTH   = 20.0;
 const ROBOT_LENGTH  = 25.0;
 
 const SWERVE = [
-  { lx: -8.0, ly: -7.0, label: 'AR-G' },
-  { lx: -8.0, ly:  7.0, label: 'AR-D' },
+  { lx:  0.0, ly: -8.0, label: 'CT-G' },
+  { lx:  0.0, ly:  8.0, label: 'CT-D' },
 ];
 
 const CASTERS = [
-  { lx:  8.0, ly: -7.0, label: 'AV-G' },
-  { lx:  8.0, ly:  7.0, label: 'AV-D' },
+  { lx:  10.0, ly: -8.0, label: 'AV-G' },
+  { lx:  10.0, ly:  8.0, label: 'AV-D' },
+  { lx: -10.0, ly: -8.0, label: 'AR-G' },
+  { lx: -10.0, ly:  8.0, label: 'AR-D' },
 ];
 
 const PWM_MIN         = 145;
@@ -478,14 +480,17 @@ function draw() {
   ctx.fill();
   ctx.stroke();
 
-  // Flèche avant
-  ctx.fillStyle = 'white';
-  ctx.beginPath();
-  ctx.moveTo(rl/2 + 8*S, 0);
-  ctx.lineTo(rl/2 - 4*S, -6*S);
-  ctx.lineTo(rl/2 - 4*S,  6*S);
-  ctx.closePath();
-  ctx.fill();
+  // Pince (cosmétique)
+  const px = rl/2;
+  const pw = 5*S, pd = 10*S, pt = 4*S;
+  ctx.strokeStyle = '#c8d8ff';
+  ctx.lineWidth = 2.5;
+  ctx.lineJoin = 'round';
+  ctx.beginPath(); ctx.moveTo(px, -pw); ctx.lineTo(px + pd, -pw); ctx.lineTo(px + pd, -pw + pt); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(px, pw);  ctx.lineTo(px + pd, pw);  ctx.lineTo(px + pd,  pw - pt); ctx.stroke();
+  ctx.strokeStyle = 'rgba(200,216,255,0.4)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(px, -pw); ctx.lineTo(px, pw); ctx.stroke();
 
   ctx.restore();
 
