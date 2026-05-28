@@ -291,14 +291,9 @@ class SwerveRobot {
     const vy_cmd = clamp(Ky * ey_r, -MAX_VXY, MAX_VXY);
 
     const angle_to_target = Math.atan2(ey, ex);
-    let desired_heading;
-    if (ttheta !== null) {
-      // Blend progressivement de angle_to_target (loin) vers ttheta (proche)
-      const blend = Math.max(0, 1 - distance / 25);
-      desired_heading = angle_to_target + blend * norm(ttheta - angle_to_target);
-    } else {
-      desired_heading = angle_to_target;
-    }
+    // Swerve : cap indépendant de la direction de déplacement.
+    // Quand un angle d'arrivée est demandé, on le vise dès le début.
+    const desired_heading = ttheta !== null ? ttheta : angle_to_target;
     const etheta = norm(desired_heading - this.theta);
     const omega_cmd = (distance > 5 || ttheta !== null)
       ? clamp(Ktheta * etheta, -MAX_OMEGA, MAX_OMEGA) : 0;
