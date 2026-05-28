@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Swerve Drive Simulator</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    padding: 10px;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+  }
+  .container {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    width: 100%;
+    max-width: 900px;
+  }
+  .card {
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+    padding: 15px;
+  }
+  .card h2 {
+    font-size: 16px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #4a4a6a;
+    margin-bottom: 12px;
+  }
+  .instruction {
+    text-align: center;
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 8px;
+    letter-spacing: 0.5px;
+  }
+  canvas {
+    display: block;
+    margin: 0 auto;
+    border-radius: 10px;
+    touch-action: none;
+    cursor: crosshair;
+    background: #1a1a2e;
+  }
+  .sliders-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  @media (max-width: 500px) {
+    .sliders-grid { grid-template-columns: 1fr; }
+  }
+  .slider-group label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #555;
+    margin-bottom: 4px;
+  }
+  .slider-group .val {
+    float: right;
+    font-weight: 700;
+    color: #764ba2;
+  }
+  input[type=range] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: linear-gradient(90deg, #667eea, #764ba2);
+    outline: none;
+    cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(118,75,162,0.4);
+  }
+  input[type=range]::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 2px 6px rgba(118,75,162,0.4);
+  }
+  .info-card {
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 12px;
+    color: #333;
+    line-height: 1.8;
+  }
+  .info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  @media (max-width: 500px) {
+    .info-grid { grid-template-columns: 1fr; }
+  }
+  .buttons-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .btn {
+    flex: 1;
+    min-width: 140px;
+    padding: 10px 16px;
+    border: none;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.1s, box-shadow 0.1s;
+    letter-spacing: 0.5px;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    box-shadow: 0 4px 15px rgba(102,126,234,0.4);
+  }
+  .btn-secondary {
+    background: linear-gradient(135deg, #f093fb, #f5576c);
+    color: white;
+    box-shadow: 0 4px 15px rgba(240,147,251,0.4);
+  }
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    font-size: 12px;
+    color: #555;
+  }
+  .legend span {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%; display: inline-block;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="card">
+    <h2>Swerve Drive Simulator</h2>
+    <p class="instruction">👆 Cliquez ou touchez le canvas pour définir un objectif</p>
+    <canvas id="canvas"></canvas>
+  </div>
+
+  <div class="card">
+    <h2>Paramètres</h2>
+    <div class="sliders-grid">
+      <div class="slider-group">
+        <label>Gain Kx <span class="val" id="val-kx">2.0</span></label>
+        <input type="range" id="sl-kx" min="0.5" max="5.0" step="0.1" value="2.0">
+      </div>
+      <div class="slider-group">
+        <label>Gain Ky <span class="val" id="val-ky">2.0</span></label>
+        <input type="range" id="sl-ky" min="0.5" max="5.0" step="0.1" value="2.0">
+      </div>
+      <div class="slider-group">
+        <label>Gain Kθ (cap) <span class="val" id="val-kt">1.5</span></label>
+        <input type="range" id="sl-kt" min="0.5" max="5.0" step="0.1" value="1.5">
+      </div>
+      <div class="slider-group">
+        <label>Vmax <span class="val" id="val-vmax">30 cm/s</span></label>
+        <input type="range" id="sl-vmax" min="10" max="100" step="5" value="30">
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>État Robot &amp; Modules</h2>
+    <div class="info-grid">
+      <div class="info-card" id="state-card">
+        x: — cm<br>
+        y: — cm<br>
+        θ: — °<br>
+        vx: — cm/s<br>
+        vy: — cm/s<br>
+        ω: — °/s
+      </div>
+      <div class="info-card" id="modules-card">
+        AR-G — angle: —° | speed: — | PWM: —<br>
+        AR-D — angle: —° | speed: — | PWM: —
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="buttons-row">
+      <button class="btn btn-primary" id="btn-reset">🔄 Reset Position</button>
+      <button class="btn btn-secondary" id="btn-clear">🗑️ Effacer Trajectoire</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Légende</h2>
+    <div class="legend">
+      <span><span class="status-dot" style="background:#4a90d9"></span> Robot</span>
+      <span><span class="status-dot" style="background:#00cc00"></span> Modules Swerve (arrière)</span>
+      <span><span class="status-dot" style="background:#888"></span> Roues folles (avant)</span>
+      <span><span class="status-dot" style="background:#ff4444"></span> Objectif</span>
+      <span><span class="status-dot" style="background:#aaa"></span> Trajectoire</span>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── Constantes robot ───────────────────────────────────────────────────────
+const ROBOT_WIDTH   = 20.0;
+const ROBOT_LENGTH  = 25.0;
+
+const SWERVE = [
+  { lx: -8.0, ly: -7.0, label: 'AR-G' },
+  { lx: -8.0, ly:  7.0, label: 'AR-D' },
+];
+
+const CASTERS = [
+  { lx:  8.0, ly: -7.0, label: 'AV-G' },
+  { lx:  8.0, ly:  7.0, label: 'AV-D' },
+];
+
+const PWM_MIN         = 145;
+const PWM_MAX         = 255;
+const MAX_WHEEL_SPEED = 50.0;
+
+let Kx     = 2.0;
+let Ky     = 2.0;
+let Ktheta = 1.5;
+let MAX_VXY   = 30.0;
+let MAX_OMEGA = 2.0;
+
+const DT    = 0.05;
+const SCALE = 3;
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+function norm(a) { return Math.atan2(Math.sin(a), Math.cos(a)); }
+
+function speedToPWM(speed) {
+  if (Math.abs(speed) < 1) return 0;
+  const n = clamp(speed / MAX_WHEEL_SPEED, -1, 1);
+  if (n > 0) return Math.round(PWM_MIN + (PWM_MAX - PWM_MIN) * n);
+  else       return Math.round(-PWM_MIN + (-PWM_MAX + PWM_MIN) * n);
+}
+
+// ─── Classe SwerveRobot ─────────────────────────────────────────────────────
+class SwerveRobot {
+  constructor(x, y, theta) {
+    this.x = x; this.y = y; this.theta = theta;
+    this.vx = 0; this.vy = 0; this.omega = 0;
+    this.moduleAngles = [0, 0];
+    this.moduleSpeeds = [0, 0];
+  }
+
+  computeControl(tx, ty) {
+    const ex = tx - this.x;
+    const ey = ty - this.y;
+    const distance = Math.sqrt(ex*ex + ey*ey);
+
+    const cos_t = Math.cos(this.theta);
+    const sin_t = Math.sin(this.theta);
+    const ex_r =  ex*cos_t + ey*sin_t;
+    const ey_r = -ex*sin_t + ey*cos_t;
+
+    const vx_cmd = clamp(Kx * ex_r, -MAX_VXY, MAX_VXY);
+    const vy_cmd = clamp(Ky * ey_r, -MAX_VXY, MAX_VXY);
+
+    const angle_to_target = Math.atan2(ey, ex);
+    let etheta = norm(angle_to_target - this.theta);
+    const omega_cmd = (distance > 5) ? clamp(Ktheta * etheta, -MAX_OMEGA, MAX_OMEGA) : 0;
+
+    return { vx_cmd, vy_cmd, omega_cmd, distance };
+  }
+
+  inverseKinematics(vx_cmd, vy_cmd, omega_cmd) {
+    const results = [];
+    const speeds = [];
+    const angles = [];
+
+    for (let i = 0; i < SWERVE.length; i++) {
+      const { lx, ly } = SWERVE[i];
+      const vx_mod = vx_cmd - omega_cmd * ly;
+      const vy_mod = vy_cmd + omega_cmd * lx;
+
+      let speed = Math.sqrt(vx_mod*vx_mod + vy_mod*vy_mod);
+      let angle = Math.atan2(vy_mod, vx_mod);
+
+      let diff = norm(angle - this.moduleAngles[i]);
+      if (Math.abs(diff) > Math.PI / 2) {
+        angle = norm(angle + Math.PI);
+        speed = -speed;
+      }
+      this.moduleAngles[i] = angle;
+      this.moduleSpeeds[i] = speed;
+      speeds.push(speed);
+      angles.push(angle);
+    }
+
+    const maxSpeed = Math.max(...speeds.map(Math.abs));
+    let scale = 1;
+    if (maxSpeed > MAX_WHEEL_SPEED) scale = MAX_WHEEL_SPEED / maxSpeed;
+
+    for (let i = 0; i < SWERVE.length; i++) {
+      const s = speeds[i] * scale;
+      this.moduleSpeeds[i] = s;
+      results.push({ speed: s, angle: angles[i], pwm: speedToPWM(s) });
+    }
+    return results;
+  }
+
+  update(vx_cmd, vy_cmd, omega_cmd, dt) {
+    const cos_t = Math.cos(this.theta);
+    const sin_t = Math.sin(this.theta);
+    this.x     += (vx_cmd*cos_t - vy_cmd*sin_t) * dt;
+    this.y     += (vx_cmd*sin_t + vy_cmd*cos_t) * dt;
+    this.theta  = norm(this.theta + omega_cmd * dt);
+    this.vx = vx_cmd; this.vy = vy_cmd; this.omega = omega_cmd;
+  }
+}
+
+// ─── Canvas & état global ───────────────────────────────────────────────────
+const canvas = document.getElementById('canvas');
+const ctx    = canvas.getContext('2d');
+
+let canvasW = 800, canvasH = 600;
+let robot = new SwerveRobot(0, 0, 0);
+let target = null;
+let running = false;
+let trajectory = [];
+let lastModules = null;
+let lastCtrl = null;
+
+function resizeCanvas() {
+  const maxW = Math.min(900, window.innerWidth - 32);
+  const ratio = 600 / 800;
+  canvasW = maxW;
+  canvasH = Math.round(maxW * ratio);
+  canvas.width  = canvasW;
+  canvas.height = canvasH;
+}
+
+function worldToCanvas(x, y) {
+  return [
+    canvasW/2 + x * SCALE * (canvasW/800),
+    canvasH/2 - y * SCALE * (canvasH/600),
+  ];
+}
+
+function canvasToWorld(cx, cy) {
+  return [
+    (cx - canvasW/2) / (SCALE * (canvasW/800)),
+    -(cy - canvasH/2) / (SCALE * (canvasH/600)),
+  ];
+}
+
+// ─── Dessin ─────────────────────────────────────────────────────────────────
+function draw() {
+  ctx.clearRect(0, 0, canvasW, canvasH);
+
+  // Grille
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.lineWidth = 1;
+  const step = 20 * SCALE * (canvasW/800);
+  const ox = canvasW/2, oy = canvasH/2;
+  for (let x = ox % step; x < canvasW; x += step) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,canvasH); ctx.stroke(); }
+  for (let y = oy % step; y < canvasH; y += step) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(canvasW,y); ctx.stroke(); }
+
+  // Axes
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(ox,0); ctx.lineTo(ox,canvasH); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0,oy); ctx.lineTo(canvasW,oy); ctx.stroke();
+
+  // Trajectoire
+  if (trajectory.length > 1) {
+    ctx.beginPath();
+    const [tx0,ty0] = worldToCanvas(trajectory[0][0], trajectory[0][1]);
+    ctx.moveTo(tx0, ty0);
+    for (let i = 1; i < trajectory.length; i++) {
+      const [tx,ty] = worldToCanvas(trajectory[i][0], trajectory[i][1]);
+      ctx.lineTo(tx, ty);
+    }
+    ctx.strokeStyle = 'rgba(180,180,180,0.7)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  // Objectif
+  if (target) {
+    const [tx, ty] = worldToCanvas(target[0], target[1]);
+    ctx.beginPath(); ctx.arc(tx, ty, 8, 0, Math.PI*2);
+    ctx.fillStyle = '#ff4444'; ctx.fill();
+    ctx.strokeStyle = '#ff0000'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = 'white';
+    ctx.font = `bold ${11 * canvasW/800}px -apple-system,sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.fillText('Objectif', tx, ty - 13);
+  }
+
+  const [rx, ry] = worldToCanvas(robot.x, robot.y);
+  const S = canvasW / 800;
+  const th = robot.theta;
+
+  ctx.save();
+  ctx.translate(rx, ry);
+  ctx.rotate(-th);
+
+  // Corps du robot
+  const rw = ROBOT_WIDTH  * SCALE * S;
+  const rl = ROBOT_LENGTH * SCALE * S;
+  ctx.fillStyle = '#4a90d9';
+  ctx.strokeStyle = '#2c5aa0';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(-rl/2, -rw/2, rl, rw, 4);
+  ctx.fill();
+  ctx.stroke();
+
+  // Flèche avant
+  ctx.fillStyle = 'white';
+  ctx.beginPath();
+  ctx.moveTo(rl/2 + 8*S, 0);
+  ctx.lineTo(rl/2 - 4*S, -6*S);
+  ctx.lineTo(rl/2 - 4*S,  6*S);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.restore();
+
+  // Lignes pointillées module → objectif
+  if (target && running) {
+    ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = 'rgba(255,165,0,0.6)';
+    ctx.lineWidth = 1;
+    const [ttx, tty] = worldToCanvas(target[0], target[1]);
+    for (let i = 0; i < SWERVE.length; i++) {
+      const s = SWERVE[i];
+      const mx = robot.x + s.lx*Math.cos(th) - s.ly*Math.sin(th);
+      const my = robot.y + s.lx*Math.sin(th) + s.ly*Math.cos(th);
+      const [cmx, cmy] = worldToCanvas(mx, my);
+      ctx.beginPath(); ctx.moveTo(cmx, cmy); ctx.lineTo(ttx, tty); ctx.stroke();
+    }
+    ctx.setLineDash([]);
+  }
+
+  // Modules swerve
+  for (let i = 0; i < SWERVE.length; i++) {
+    const s = SWERVE[i];
+    const mx = robot.x + s.lx*Math.cos(th) - s.ly*Math.sin(th);
+    const my = robot.y + s.lx*Math.sin(th) + s.ly*Math.cos(th);
+    const [cmx, cmy] = worldToCanvas(mx, my);
+    const mAngle = robot.moduleAngles[i];
+
+    ctx.save();
+    ctx.translate(cmx, cmy);
+    ctx.rotate(-mAngle);
+    ctx.fillStyle = '#00cc00';
+    ctx.strokeStyle = '#009900';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.roundRect(-7*S, -3.5*S, 14*S, 7*S, 2);
+    ctx.fill(); ctx.stroke();
+    ctx.restore();
+
+    ctx.fillStyle = '#00ee00';
+    ctx.font = `bold ${10*S}px -apple-system,sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.fillText(s.label, cmx, cmy - 9*S);
+  }
+
+  // Roues folles
+  for (let i = 0; i < CASTERS.length; i++) {
+    const c = CASTERS[i];
+    const cx2 = robot.x + c.lx*Math.cos(th) - c.ly*Math.sin(th);
+    const cy2 = robot.y + c.lx*Math.sin(th) + c.ly*Math.cos(th);
+    const [ccx, ccy] = worldToCanvas(cx2, cy2);
+    ctx.beginPath();
+    ctx.arc(ccx, ccy, 5*S, 0, Math.PI*2);
+    ctx.fillStyle = '#888'; ctx.fill();
+    ctx.strokeStyle = '#555'; ctx.lineWidth = 1; ctx.stroke();
+    ctx.fillStyle = '#ccc';
+    ctx.font = `${9*S}px -apple-system,sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.fillText(c.label, ccx, ccy - 8*S);
+  }
+}
+
+// ─── UI ─────────────────────────────────────────────────────────────────────
+function updateUI(ctrl, mods) {
+  document.getElementById('state-card').innerHTML =
+    `x: ${robot.x.toFixed(1)} cm<br>` +
+    `y: ${robot.y.toFixed(1)} cm<br>` +
+    `θ: ${(robot.theta * 180/Math.PI).toFixed(1)}°<br>` +
+    `vx: ${robot.vx.toFixed(1)} cm/s<br>` +
+    `vy: ${robot.vy.toFixed(1)} cm/s<br>` +
+    `ω: ${(robot.omega * 180/Math.PI).toFixed(1)} °/s`;
+
+  if (mods) {
+    document.getElementById('modules-card').innerHTML =
+      SWERVE.map((s, i) =>
+        `${s.label} — angle: ${(mods[i].angle*180/Math.PI).toFixed(0)}° | speed: ${mods[i].speed.toFixed(1)} cm/s | PWM: ${mods[i].pwm}`
+      ).join('<br>');
+  }
+}
+
+// ─── Boucle simulate ────────────────────────────────────────────────────────
+setInterval(() => {
+  if (running && target) {
+    const ctrl = robot.computeControl(target[0], target[1]);
+    const mods = robot.inverseKinematics(ctrl.vx_cmd, ctrl.vy_cmd, ctrl.omega_cmd);
+    robot.update(ctrl.vx_cmd, ctrl.vy_cmd, ctrl.omega_cmd, DT);
+    trajectory.push([robot.x, robot.y]);
+    if (trajectory.length > 1000) trajectory = trajectory.slice(-500);
+    if (ctrl.distance < 2) {
+      running = false;
+      robot.vx = 0; robot.vy = 0; robot.omega = 0;
+    }
+    lastCtrl = ctrl; lastModules = mods;
+    updateUI(ctrl, mods);
+  }
+  draw();
+}, DT * 1000);
+
+// ─── Événements canvas ───────────────────────────────────────────────────────
+function handlePointer(e) {
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  let cx, cy;
+  if (e.touches) {
+    cx = e.touches[0].clientX - rect.left;
+    cy = e.touches[0].clientY - rect.top;
+  } else {
+    cx = e.clientX - rect.left;
+    cy = e.clientY - rect.top;
+  }
+  // Ajuster selon la taille CSS vs canvas interne
+  const scaleX = canvasW / rect.width;
+  const scaleY = canvasH / rect.height;
+  target = canvasToWorld(cx * scaleX, cy * scaleY);
+  running = true;
+}
+
+canvas.addEventListener('click',      handlePointer);
+canvas.addEventListener('touchstart', handlePointer, { passive: false });
+
+// ─── Sliders ─────────────────────────────────────────────────────────────────
+document.getElementById('sl-kx').addEventListener('input', e => {
+  Kx = parseFloat(e.target.value);
+  document.getElementById('val-kx').textContent = Kx.toFixed(1);
+});
+document.getElementById('sl-ky').addEventListener('input', e => {
+  Ky = parseFloat(e.target.value);
+  document.getElementById('val-ky').textContent = Ky.toFixed(1);
+});
+document.getElementById('sl-kt').addEventListener('input', e => {
+  Ktheta = parseFloat(e.target.value);
+  document.getElementById('val-kt').textContent = Ktheta.toFixed(1);
+});
+document.getElementById('sl-vmax').addEventListener('input', e => {
+  MAX_VXY = parseFloat(e.target.value);
+  document.getElementById('val-vmax').textContent = MAX_VXY + ' cm/s';
+});
+
+// ─── Boutons ─────────────────────────────────────────────────────────────────
+document.getElementById('btn-reset').addEventListener('click', () => {
+  robot = new SwerveRobot(0, 0, 0);
+  target = null; running = false; trajectory = [];
+  lastModules = null; lastCtrl = null;
+  document.getElementById('state-card').innerHTML =
+    'x: 0.0 cm<br>y: 0.0 cm<br>θ: 0.0°<br>vx: 0.0 cm/s<br>vy: 0.0 cm/s<br>ω: 0.0 °/s';
+  document.getElementById('modules-card').innerHTML =
+    'AR-G — angle: 0° | speed: 0.0 cm/s | PWM: 0<br>AR-D — angle: 0° | speed: 0.0 cm/s | PWM: 0';
+  draw();
+});
+document.getElementById('btn-clear').addEventListener('click', () => {
+  trajectory = [];
+  draw();
+});
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+window.addEventListener('resize', () => { resizeCanvas(); draw(); });
+resizeCanvas();
+draw();
+</script>
+</body>
+</html>
