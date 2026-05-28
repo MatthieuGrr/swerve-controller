@@ -576,19 +576,12 @@ setInterval(() => {
   if (running && target) {
     const ctrl = robot.computeControl(target[0], target[1], target_theta);
 
-    let vx = ctrl.vx_cmd, vy = ctrl.vy_cmd, omega = ctrl.omega_cmd;
-    const at_pos = ctrl.distance < 2;
-    const heading_err = target_theta !== null ? Math.abs(norm(robot.theta - target_theta)) : 0;
-    const heading_ok  = target_theta === null || heading_err < 0.1;
+    const at_pos    = ctrl.distance < 2;
+    const heading_ok = target_theta === null
+      || Math.abs(norm(robot.theta - target_theta)) < 0.1;
 
-    // Position atteinte mais cap pas encore aligné : rotation sur place
-    if (at_pos && !heading_ok) {
-      vx = 0; vy = 0;
-      omega = clamp(Ktheta * norm(target_theta - robot.theta), -MAX_OMEGA, MAX_OMEGA);
-    }
-
-    const mods = robot.inverseKinematics(vx, vy, omega);
-    robot.update(vx, vy, omega, DT);
+    const mods = robot.inverseKinematics(ctrl.vx_cmd, ctrl.vy_cmd, ctrl.omega_cmd);
+    robot.update(ctrl.vx_cmd, ctrl.vy_cmd, ctrl.omega_cmd, DT);
     trajectory.push([robot.x, robot.y]);
     if (trajectory.length > 1000) trajectory = trajectory.slice(-500);
     if (at_pos && heading_ok) {
