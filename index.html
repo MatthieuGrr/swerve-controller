@@ -287,8 +287,10 @@ class SwerveRobot {
     const ex_r =  ex*cos_t + ey*sin_t;
     const ey_r = -ex*sin_t + ey*cos_t;
 
-    const vx_cmd = clamp(Kx * ex_r, -MAX_VXY, MAX_VXY);
-    const vy_cmd = clamp(Ky * ey_r, -MAX_VXY, MAX_VXY);
+    let vx_cmd = Kx * ex_r;
+    let vy_cmd = Ky * ey_r;
+    const spd = Math.sqrt(vx_cmd*vx_cmd + vy_cmd*vy_cmd);
+    if (spd > MAX_VXY) { vx_cmd = vx_cmd/spd * MAX_VXY; vy_cmd = vy_cmd/spd * MAX_VXY; }
 
     const angle_to_target = Math.atan2(ey, ex);
     // Swerve : cap indépendant de la direction de déplacement.
