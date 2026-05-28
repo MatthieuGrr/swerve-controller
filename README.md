@@ -1,6 +1,6 @@
 # Swerve Drive Simulator
 
-Simulateur 2D d'un robot à deux modules swerve (arrière) et deux roues folles passives (avant).  
+Simulateur 2D d'un robot à deux modules swerve (centre) et quatre roues folles passives (coins), équipé d'une pince à l'avant.  
 Testable directement sur mobile : **https://matthieugrr.github.io/swerve-controller/**
 
 ---
@@ -28,10 +28,11 @@ La boucle tourne à **20 Hz (DT = 0.05 s)** et enchaîne trois étapes à chaque
 ex_r =  ex·cos θ + ey·sin θ   ← erreur projetée axe avant du robot
 ey_r = -ex·sin θ + ey·cos θ   ← erreur projetée axe latéral
 
-vx_cmd = Kx · ex_r   (saturé à ±MAX_VXY)
-vy_cmd = Ky · ey_r   (saturé à ±MAX_VXY)
+‖v‖ = √((Kx·ex_r)² + (Ky·ey_r)²)
+vx_cmd = Kx·ex_r · min(1, MAX_VXY/‖v‖)   ← saturation vectorielle
+vy_cmd = Ky·ey_r · min(1, MAX_VXY/‖v‖)      (préserve la direction)
 
-etheta  = desired_heading − θ   (normalisé dans [−π, π])
+etheta  = sawtooth(desired_heading − θ)   (normalisé dans [−π, π])
 omega   = Kθ · etheta           (saturé à ±MAX_OMEGA)
 ```
 
@@ -96,13 +97,18 @@ Augmenter les gains accélère la convergence mais peut provoquer des oscillatio
 ## Géométrie du robot
 
 ```
-        AV-G ○          ○ AV-D       ← roues folles passives
-         (8, -7)      (8, 7)
+   AV-G ○────────────────────○ AV-D   ← roues folles passives (avant)
+        (10,-8)          (10, 8)
 
-        AR-G □          □ AR-D       ← modules swerve motorisés
-        (-8, -7)     (-8, 7)
+   CT-G □                    □ CT-D   ← modules swerve motorisés (centre)
+        (0, -8)           (0,  8)
 
-              → avant du robot (x+)
+   AR-G ○────────────────────○ AR-D   ← roues folles passives (arrière)
+        (-10,-8)         (-10, 8)
+
+   [====pince====]→   avant du robot (x+)
 ```
 
-Coordonnées en cm dans le repère robot. Les deux modules swerve étant tous les deux à l'arrière (même `lx`), le couplage entre `vy` et `omega` est géré par le contrôleur de cap.
+Coordonnées en cm dans le repère robot. Les modules swerve sont centrés (`lx = 0`) pour minimiser le couplage entre `vy` et `omega`. Les roues folles occupent les quatre coins.
+
+**Visualisation** : chaque module swerve affiche une bande verte claire et un point blanc sur sa demi-roue avant, permettant de lire l'orientation en temps réel.
